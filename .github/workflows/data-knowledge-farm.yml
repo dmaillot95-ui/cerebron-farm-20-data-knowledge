@@ -42,6 +42,7 @@ jobs:
           MODEL: ${{ matrix.model }}
           FOCUS: ${{ matrix.focus }}
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: data-knowledge-${{ matrix.role }}
           path: results/${{ matrix.role }}.json
@@ -59,7 +60,7 @@ jobs:
           for f in glob.glob('all-results/*.json'):
               try: rows.append(json.load(open(f)))
               except: pass
-          packet={'farm':'20-data-knowledge','roles_received':len(rows),'successful_external_calls':sum(x.get('status')=='success' for x in rows),'model_families':sorted(set(x.get('model','') for x in rows)),'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','results':rows}
+          packet={'farm':'20-data-knowledge','roles_received':len(rows),'successful_external_ai_calls':sum(bool(x.get('inference_success')) for x in rows),'failed_external_ai_calls':sum(not bool(x.get('inference_success')) for x in rows),'model_families':sorted(set(x.get('model','') for x in rows if x.get('model'))),'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','results':rows}
           os.makedirs('omega',exist_ok=True)
           json.dump(packet,open('omega/packet.json','w'),ensure_ascii=False,indent=2)
           PY
