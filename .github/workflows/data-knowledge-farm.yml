@@ -1,0 +1,69 @@
+name: CEREBRON Farm 20 Data Knowledge
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  agents:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - {role: DATA_INGESTION_ARCHITECT, model: huggingface-projects/llama-3.2-3B-Instruct, focus: ingestion and source normalization}
+          - {role: DATA_QUALITY_AUDITOR, model: huggingface-projects/gemma-2-9b-it, focus: quality controls and anomaly detection}
+          - {role: DATA_GOVERNANCE_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: governance lineage ownership retention}
+          - {role: PROVENANCE_TRACKER, model: huggingface-projects/gemma-2-9b-it, focus: provenance dependency and evidence chains}
+          - {role: ENTITY_RESOLUTION_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: entity resolution and canonical identifiers}
+          - {role: DEDUPLICATION_SPECIALIST, model: huggingface-projects/gemma-2-9b-it, focus: duplicate and source dependence detection}
+          - {role: ONTOLOGY_ARCHITECT, model: huggingface-projects/llama-3.2-3B-Instruct, focus: ontologies taxonomies and semantic schemas}
+          - {role: KNOWLEDGE_GRAPH_SPECIALIST, model: huggingface-projects/gemma-2-9b-it, focus: knowledge graphs and relation integrity}
+          - {role: RETRIEVAL_SEARCH_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: retrieval indexing and search relevance}
+          - {role: MEMORY_ARCHITECT, model: huggingface-projects/gemma-2-9b-it, focus: persistent memory lifecycle and recall}
+          - {role: COMPRESSION_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: information compression with loss accounting}
+          - {role: SCHEMA_INTEGRATION_SPECIALIST, model: huggingface-projects/gemma-2-9b-it, focus: schema mapping and interoperability}
+          - {role: TEMPORAL_KNOWLEDGE_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct, focus: temporal validity versioning and change}
+          - {role: CLAIM_LEDGER_ARCHITECT, model: huggingface-projects/gemma-2-9b-it, focus: claims evidence status and confidence separation}
+          - {role: CONTRADICTION_RESOLVER, model: huggingface-projects/llama-3.2-3B-Instruct, focus: contradiction classification without forced consensus}
+          - {role: UNKNOWN_GAP_TRACKER, model: huggingface-projects/gemma-2-9b-it, focus: missing data unknowns and residual gaps}
+          - {role: KNOWLEDGE_SECURITY_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct, focus: integrity access poisoning and provenance attacks}
+          - {role: INDEPENDENT_REPLICATOR, model: huggingface-projects/gemma-2-9b-it, focus: independent reconstruction of knowledge products}
+          - {role: KNOWLEDGE_SYNTHESIZER, model: huggingface-projects/llama-3.2-3B-Instruct, focus: cross-source synthesis with traceability}
+          - {role: OMEGA_DATA_KNOWLEDGE_JUDGE, model: huggingface-projects/gemma-2-9b-it, focus: final evidence classification and residual audit}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: pip install hf-gradio
+      - run: python worker/farm_worker.py
+        env:
+          ROLE: ${{ matrix.role }}
+          MODEL: ${{ matrix.model }}
+          FOCUS: ${{ matrix.focus }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-knowledge-${{ matrix.role }}
+          path: results/${{ matrix.role }}.json
+  omega:
+    needs: agents
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {pattern: data-knowledge-*, merge-multiple: true, path: all-results}
+      - run: |
+          python - <<'PY'
+          import json,glob,os
+          rows=[]
+          for f in glob.glob('all-results/*.json'):
+              try: rows.append(json.load(open(f)))
+              except: pass
+          packet={'farm':'20-data-knowledge','roles_received':len(rows),'successful_external_calls':sum(x.get('status')=='success' for x in rows),'model_families':sorted(set(x.get('model','') for x in rows)),'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','results':rows}
+          os.makedirs('omega',exist_ok=True)
+          json.dump(packet,open('omega/packet.json','w'),ensure_ascii=False,indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-knowledge-farm-20-omega-packet
+          path: omega/packet.json
